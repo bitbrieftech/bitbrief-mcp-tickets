@@ -29,3 +29,15 @@ def search(query: str, status: str | None = None, limit: int = 10) -> list[dict]
     params.append(limit)
     with _lock:
         return [dict(row) for row in _conn.execute(sql, params)]
+
+
+def get(ticket_id: int) -> dict | None:
+    """One ticket with its notes, or None if there is no such ticket."""
+    with _lock:
+        row = _conn.execute("SELECT * FROM tickets WHERE id = ?", (ticket_id,)).fetchone()
+        if row is None:
+            return None
+        notes = _conn.execute(
+            "SELECT body, created_at FROM notes WHERE ticket_id = ? ORDER BY id", (ticket_id,)
+        ).fetchall()
+    return {**dict(row), "notes": [dict(n) for n in notes]}

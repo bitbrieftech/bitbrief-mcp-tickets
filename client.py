@@ -2,6 +2,8 @@
 
     python client.py tools
     python client.py call search_tickets '{"query": "refund"}'
+    python client.py resources
+    python client.py read ticket://3
 """
 
 import argparse
@@ -21,6 +23,12 @@ async def main(args: argparse.Namespace) -> None:
             for tool in (await client.list_tools()).tools:
                 print(f"{tool.name}: {tool.description.splitlines()[0]}")
                 print(json.dumps(tool.input_schema["properties"], indent=2))
+        elif args.command == "resources":
+            for template in (await client.list_resource_templates()).resource_templates:
+                print(f"{template.uri_template}: {template.description}")
+        elif args.command == "read":
+            for content in (await client.read_resource(args.uri)).contents:
+                print(content.text)
         elif args.command == "call":
             result = await client.call_tool(args.name, json.loads(args.arguments))
             if result.is_error:
@@ -40,6 +48,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("tools")
+    sub.add_parser("resources")
+    sub.add_parser("read").add_argument("uri")
     call = sub.add_parser("call")
     call.add_argument("name")
     call.add_argument("arguments", nargs="?", default="{}")
