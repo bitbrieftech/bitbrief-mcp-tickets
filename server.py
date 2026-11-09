@@ -1,17 +1,33 @@
 """An MCP server for a support ticket queue."""
 
+import sys
 from datetime import date
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field
 
 from mcp.server import MCPServer
+from mcp.server.auth.middleware.auth_context import get_access_token
+from mcp.server.auth.settings import AuthSettings
 from mcp.server.mcpserver.exceptions import ToolError
 from mcp.types import ToolAnnotations
 
+import auth
 import db
 
-mcp = MCPServer("tickets", instructions="Search, read and annotate the support ticket queue.", log_level="WARNING")
+mcp = MCPServer(
+    "tickets",
+    instructions="Search, read and annotate the support ticket queue.",
+    log_level="WARNING",
+    # Over HTTP, every request needs a bearer token with at least tickets:read.
+    token_verifier=auth.DemoTokenVerifier(),
+    auth=AuthSettings(
+        issuer_url="https://auth.example.com",  # your identity provider
+        resource_server_url="http://127.0.0.1:8000/mcp",
+        required_scopes=[auth.READ],
+        validate_token_resource=False,  # the demo verifier checks tokens itself
+    ),
+)
 
 # Hints for the client: these two only read, so a host can run them without asking.
 READ_ONLY = ToolAnnotations(read_only_hint=True)
@@ -61,6 +77,10 @@ def add_note(ticket_id: int, note: Annotated[str, Field(min_length=1, max_length
 
     Returns the ticket with the new note, so you can confirm what was saved.
     """
+    token = get_access_token()
+    # Over HTTP every call carries a token. Locally (stdio, tests) there is none.
+    if token is not None and auth.WRITE not in token.scopes:
+        raise ToolError("This token can read tickets but not change them: it lacks tickets:write.")
     ticket = db.get(ticket_id)
     if ticket is None:
         raise ToolError(f"No ticket with id {ticket_id}. Use search_tickets to find one.")
@@ -80,4 +100,7 @@ def ticket_resource(ticket_id: int) -> str:
 
 
 if __name__ == "__main__":
-    mcp.run()
+    if "--http" in sys.argv:
+        mcp.run("streamable-http", host="127.0.0.1", port=8000)
+    else:
+        mcp.run()
