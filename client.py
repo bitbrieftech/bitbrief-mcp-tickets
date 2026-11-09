@@ -22,6 +22,8 @@ async def main(args: argparse.Namespace) -> None:
         if args.command == "tools":
             for tool in (await client.list_tools()).tools:
                 print(f"{tool.name}: {tool.description.splitlines()[0]}")
+                if tool.annotations:
+                    print("  hints:", tool.annotations.model_dump(exclude_none=True, by_alias=True))
                 print(json.dumps(tool.input_schema["properties"], indent=2))
         elif args.command == "resources":
             for template in (await client.list_resource_templates()).resource_templates:

@@ -41,3 +41,11 @@ def get(ticket_id: int) -> dict | None:
             "SELECT body, created_at FROM notes WHERE ticket_id = ? ORDER BY id", (ticket_id,)
         ).fetchall()
     return {**dict(row), "notes": [dict(n) for n in notes]}
+
+
+def add_note(ticket_id: int, body: str, created_at: str) -> None:
+    """Append an internal note to a ticket."""
+    with _lock, _conn:
+        _conn.execute(
+            "INSERT INTO notes (ticket_id, body, created_at) VALUES (?, ?, ?)", (ticket_id, body, created_at)
+        )
